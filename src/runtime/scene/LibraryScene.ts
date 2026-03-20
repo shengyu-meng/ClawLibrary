@@ -96,6 +96,10 @@ type AgentActor = {
   focusZoneId: ResourcePartitionId | null;
   workCursor: number;
   nameTag: Phaser.GameObjects.Text | null;
+  /** Current visual mode — only used for subagents (exec-processes stay static) */
+  visualMode: WorkMode;
+  /** Timestamp (ms) when working animation should end and revert to idle */
+  workingUntil: number;
 };
 
 export class LibraryScene extends Phaser.Scene {
@@ -432,8 +436,15 @@ export class LibraryScene extends Phaser.Scene {
       activeZoneId: null,
       focusZoneId: null,
       workCursor: Math.floor(Math.random() * 100),
-      nameTag
+      nameTag,
+      visualMode: 'idle',
+      workingUntil: 0
     };
+
+    // Set initial animation for subagents
+    if (kind === 'subagent') {
+      this.updateAgentActorVisual(agentActor, 'idle');
+    }
 
     this.agentActors.push(agentActor);
   }
@@ -478,6 +489,15 @@ export class LibraryScene extends Phaser.Scene {
     }
 
     if (actor.route.length === 0) {
+      // Subagent visual: if working timer expired, revert to idle
+      if (actor.kind === 'subagent') {
+        const targetMode: WorkMode = actor.workingUntil > 0 && Date.now() < actor.workingUntil ? 'working' : 'idle';
+        if (actor.visualMode !== targetMode) {
+          actor.visualMode = targetMode;
+          this.updateAgentActorVisual(actor, targetMode);
+        }
+      }
+
       // Pick next zone to wander to — exclude zones claimed by primary or other agents
       const claimedZones = new Set<string>();
       if (this.activeZoneId) {
@@ -552,6 +572,12 @@ export class LibraryScene extends Phaser.Scene {
       actor.body.setFlipX(dx < 0);
     }
 
+    // Subagent: switch to moving animation while walking
+    if (actor.kind === 'subagent' && actor.visualMode !== 'moving') {
+      actor.visualMode = 'moving';
+      this.updateAgentActorVisual(actor, 'moving');
+    }
+
     if (distance <= step) {
       actor.container.x = target.x;
       actor.container.y = target.y;
@@ -559,7 +585,13 @@ export class LibraryScene extends Phaser.Scene {
       actor.route.shift();
 
       if (actor.route.length === 0) {
-        // Arrived — linger briefly then clear zone so next frame picks new destination
+        // Arrived — subagent plays working animation briefly, then idle
+        if (actor.kind === 'subagent') {
+          actor.visualMode = 'working';
+          actor.workingUntil = Date.now() + 1400;
+          this.updateAgentActorVisual(actor, 'working');
+        }
+        // linger briefly then clear zone so next frame picks new destination
         actor.activeZoneId = null;
       }
     } else {
@@ -2465,5 +2497,42 @@ export class LibraryScene extends Phaser.Scene {
       this.lobsterBody.setTexture(actorMode.textureKey);
     }
     this.lobsterBody.setFrame(0);
+  }
+
+  /** Apply the correct animation to a subagent actor sprite, mirroring updateLobsterVisual. */
+  private updateAgentActorVisual(agentActor: AgentActor, mode: WorkMode): void {
+    if (!(agentActor.body instanceof Phaser.GameObjects.Sprite)) {
+      return;
+    }
+    const actorDef = this.protocols.sceneArt.actor;
+    const variant = this.resolveActorVariant();
+    if (!actorDef || !variant) {
+      return;
+    }
+
+    // Resolve the mode entry — reuse resolveActorMode which reads from variant.modes
+    const candidates = variant.modes.filter((m) => m.mode === mode);
+    const fallback = variant.modes.filter((m) => m.mode === 'idle');
+    const modeEntry = (candidates.length > 0 ? candidates : fallback)[0] ?? variant.modes[0];
+    if (!modeEntry) {
+      return;
+    }
+
+    const scaleFactor = 0.88; // same as spawn scale
+    agentActor.body.setDisplaySize(actorDef.displaySize.width * scaleFactor, actorDef.displaySize.height * scaleFactor);
+
+    const animationKey = this.actorAnimationKey(variant.id, modeEntry.textureKey);
+    if (modeEntry.kind === 'spritesheet' && modeEntry.frameCount && this.anims.exists(animationKey)) {
+      if (agentActor.body.anims.currentAnim?.key !== animationKey) {
+        agentActor.body.play(animationKey);
+      }
+      return;
+    }
+
+    agentActor.body.stop();
+    if (agentActor.body.texture.key !== modeEntry.textureKey) {
+      agentActor.body.setTexture(modeEntry.textureKey);
+    }
+    agentActor.body.setFrame(0);
   }
 }
