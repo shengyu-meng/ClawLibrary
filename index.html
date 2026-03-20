@@ -50,6 +50,7 @@
         width: auto;
         height: auto;
         background: transparent;
+        transition: inset 300ms ease;
       }
 
       #app canvas {
@@ -316,7 +317,7 @@
         position: fixed;
         z-index: 110;
         left: 18px;
-        bottom: 18px;
+        bottom: 58px;
         width: min(360px, calc(100vw - 36px));
         display: grid;
         gap: 10px;
@@ -337,38 +338,69 @@
         pointer-events: none;
       }
 
+      /* Legacy — hidden, replaced by panel-switcher */
       .hud-activity-toggle {
+        display: none !important;
+      }
+
+      /* ── Panel switcher (Info | Chat) ─────────────────────────────── */
+      .panel-switcher {
         position: fixed;
         z-index: 116;
         left: 18px;
-        bottom: 184px;
-        border: 1px solid rgba(171, 218, 201, 0.34);
+        bottom: 18px;
+        display: flex;
+        gap: 0;
         border-radius: 999px;
-        padding: 4px 9px;
-        background: rgba(9, 24, 22, 0.74);
-        color: #d6eee5;
+        border: 1px solid rgba(171, 218, 201, 0.28);
+        background: rgba(9, 24, 22, 0.82);
+        backdrop-filter: blur(8px);
+        overflow: hidden;
+        transition: bottom 140ms ease;
+      }
+
+      .panel-switcher-btn {
+        border: none;
+        border-radius: 0;
+        padding: 5px 12px;
+        background: transparent;
+        color: rgba(152, 181, 172, 0.78);
         font-family: "VT323", monospace;
         font-size: 14px;
         line-height: 1;
         letter-spacing: 0.04em;
         cursor: pointer;
         transition:
-          bottom 140ms ease,
-          border-color 120ms ease,
-          transform 120ms ease,
           background 120ms ease,
           color 120ms ease;
+        min-height: 32px;
+        white-space: nowrap;
       }
 
-      .hud-activity-toggle:hover {
-        border-color: rgba(171, 218, 201, 0.72);
-        background: rgba(12, 31, 28, 0.86);
+      .panel-switcher-btn:first-child {
+        border-radius: 999px 0 0 999px;
+      }
+
+      .panel-switcher-btn:last-child {
+        border-radius: 0 999px 999px 0;
+      }
+
+      .panel-switcher-btn + .panel-switcher-btn {
+        border-left: 1px solid rgba(171, 218, 201, 0.18);
+      }
+
+      .panel-switcher-btn:hover {
+        background: rgba(12, 31, 28, 0.7);
         color: #f0fff9;
-        transform: translateY(-1px);
       }
 
-      body.info-collapsed .hud-activity-toggle {
-        bottom: 18px;
+      .panel-switcher-btn[data-active="true"] {
+        background: rgba(19, 46, 44, 0.9);
+        color: #d6eee5;
+      }
+
+      .panel-switcher-btn[data-active="true"]:hover {
+        background: rgba(22, 52, 50, 0.95);
       }
 
       .hud-stats {
@@ -530,6 +562,283 @@
         line-height: 1.28;
         text-shadow: 0 2px 10px rgba(0, 0, 0, 0.26);
         opacity: 0.92;
+      }
+
+      /* ── Live Chat panel ─────────────────────────────────────────── */
+      .hud-chat {
+        position: fixed;
+        z-index: 110;
+        left: 18px;
+        bottom: 58px;
+        width: min(432px, calc(100vw - 36px)); /* 360 * 1.2 = 432 */
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        pointer-events: auto;
+        transition:
+          opacity 140ms ease,
+          transform 140ms ease;
+        background: none;
+        border: none;
+        overflow: visible;
+        max-height: min(420px, calc(100vh - 120px));
+      }
+
+      body.chat-hidden .hud-chat {
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+      }
+
+      .hud-chat-messages {
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 0;
+        scroll-behavior: smooth;
+        scrollbar-width: none;
+      }
+
+      .hud-chat-messages::-webkit-scrollbar { display: none; }
+
+      .chat-bubble {
+        display: grid;
+        gap: 2px;
+        padding: 3px 4px 3px 0;
+        background: none;
+        border: none;
+        position: relative;
+      }
+
+      .chat-bubble[data-role="user"] {
+        /* no extra style */
+      }
+
+      .chat-bubble[data-role="assistant"] {
+        /* no extra style */
+      }
+
+      .chat-bubble-meta {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+
+      .chat-bubble-name {
+        font-family: "VT323", monospace;
+        font-size: 26px;
+        line-height: 1;
+        letter-spacing: 0.04em;
+      }
+
+      .chat-bubble[data-role="user"] .chat-bubble-name {
+        color: var(--accent);
+      }
+
+      .chat-bubble[data-role="assistant"] .chat-bubble-name {
+        color: var(--accent-2);
+      }
+
+      .chat-bubble-time {
+        color: rgba(152, 181, 172, 0.62);
+        font-family: "VT323", monospace;
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      /* User prompt: always 1 line, truncated */
+      .chat-bubble[data-role="user"] .chat-bubble-text {
+        color: rgba(204, 225, 217, 0.78);
+        font-size: 20px;
+        line-height: 1.35;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Assistant response: up to 5 lines, expandable */
+      .chat-bubble[data-role="assistant"] .chat-bubble-text {
+        color: rgba(230, 242, 238, 0.88);
+        font-size: 20px;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 5;
+        overflow: hidden;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .chat-bubble[data-role="assistant"].expanded .chat-bubble-text {
+        -webkit-line-clamp: unset;
+        overflow: visible;
+      }
+
+      .chat-bubble-expand {
+        margin-top: 2px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: rgba(126, 202, 184, 0.7);
+        font-size: 16px;
+        line-height: 1;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .chat-bubble-expand:hover {
+        color: rgba(126, 202, 184, 1);
+      }
+
+      /* Legacy hud-chat-toggle — hidden */
+      .hud-chat-toggle { display: none !important; }
+
+      @media (max-width: 700px) {
+        .hud-chat {
+          left: 10px;
+          right: 10px;
+          bottom: 48px;
+          width: auto;
+          max-width: min(408px, calc(100vw - 20px)); /* 340 * 1.2 */
+          max-height: min(360px, calc(100vh - 120px));
+        }
+
+        .panel-switcher {
+          left: 10px;
+          bottom: 10px;
+        }
+      }
+
+      /* Archive Live panel collapse */
+      .menu-panel {
+        transition:
+          transform 200ms ease,
+          opacity 200ms ease;
+      }
+
+      /* Desktop: panel desliza a la derecha → escena se expande */
+      body.archive-collapsed .menu-panel {
+        transform: translateX(calc(100% + 16px));
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      body.archive-collapsed {
+        --stage-right-gutter: 0px;
+      }
+
+      /* Mobile: panel sube → escena ocupa más espacio vertical */
+      @media (max-width: 700px) {
+        body.archive-collapsed {
+          --stage-right-gutter: 0px;
+        }
+      }
+
+      /* Botón "Hide" dentro del panel — mismo estilo pill que meta-toggle */
+      .archive-hide-btn {
+        border: 1px solid rgba(171, 218, 201, 0.34);
+        border-radius: 999px;
+        padding: 4px 9px;
+        background: rgba(9, 24, 22, 0.72);
+        color: #d6eee5;
+        font-family: "VT323", monospace;
+        font-size: 13px;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        transition:
+          border-color 120ms ease,
+          transform 120ms ease,
+          background 120ms ease,
+          color 120ms ease;
+      }
+
+      .archive-hide-btn:hover {
+        border-color: rgba(171, 218, 201, 0.72);
+        background: rgba(12, 31, 28, 0.86);
+        color: #f0fff9;
+        transform: translateY(-1px);
+      }
+
+      /* Tab "Show Archive" — Desktop: borde derecho, vertical */
+      .archive-show-tab {
+        position: fixed;
+        z-index: 120;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%) translateX(100%);
+        border: 1px solid rgba(171, 218, 201, 0.34);
+        border-right: none;
+        border-radius: 10px 0 0 10px;
+        padding: 16px 10px;
+        background: rgba(9, 24, 22, 0.88);
+        color: #d6eee5;
+        font-family: "VT323", monospace;
+        font-size: 15px;
+        line-height: 1;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        writing-mode: vertical-rl;
+        backdrop-filter: blur(8px);
+        transition:
+          transform 200ms ease,
+          opacity 200ms ease,
+          border-color 120ms ease,
+          background 120ms ease,
+          color 120ms ease;
+        min-width: 44px;
+        min-height: 88px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      body.archive-collapsed .archive-show-tab {
+        transform: translateY(-50%) translateX(0);
+        pointer-events: auto;
+        opacity: 1;
+      }
+
+      .archive-show-tab:hover {
+        border-color: rgba(171, 218, 201, 0.72);
+        background: rgba(12, 31, 28, 0.94);
+        color: #f0fff9;
+      }
+
+      /* Mobile (≤700px): panel se oculta hacia arriba, tab aparece en borde superior */
+      @media (max-width: 700px) {
+        body.archive-collapsed .menu-panel {
+          transform: translateY(calc(-100% - 16px));
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        .archive-show-tab {
+          top: 0;
+          right: auto;
+          left: 50%;
+          transform: translateX(-50%) translateY(-100%);
+          border: 1px solid rgba(171, 218, 201, 0.34);
+          border-top: none;
+          border-radius: 0 0 10px 10px;
+          padding: 10px 18px;
+          writing-mode: horizontal-tb;
+          min-width: 120px;
+          min-height: 44px;
+          font-size: 14px;
+        }
+
+        body.archive-collapsed .archive-show-tab {
+          transform: translateX(-50%) translateY(0);
+        }
       }
 
       .gateway-category-menu.hidden {
@@ -711,7 +1020,13 @@
       .preview-modal-head strong,
       .preview-modal-tools button,
       .preview-code-head,
-      .asset-action {
+      .asset-action,
+      .archive-hide-btn,
+      .archive-show-tab,
+      .hud-chat-toggle,
+      .panel-switcher-btn,
+      .chat-bubble-name,
+      .chat-bubble-time {
         font-family: var(--font-display) !important;
         letter-spacing: 0.01em;
         text-rendering: geometricPrecision;
@@ -2130,7 +2445,17 @@
       <div class="hud-actor-status" id="hud-actor-status"></div>
       <div class="hud-activity-items" id="hud-activity-items"></div>
     </div>
-    <button class="hud-activity-toggle" id="toggle-info-panel" type="button">Hide Info</button>
+    <button class="hud-activity-toggle" id="toggle-info-panel" type="button" hidden>Hide Info</button>
+    <!-- Live Chat panel -->
+    <div class="hud-chat" id="hud-chat" aria-hidden="true">
+      <div class="hud-chat-messages" id="hud-chat-messages"></div>
+    </div>
+    <button class="hud-chat-toggle" id="toggle-chat-panel" type="button" hidden>Live Chat</button>
+    <!-- Panel switcher -->
+    <div class="panel-switcher" id="panel-switcher" role="group" aria-label="Panel selector">
+      <button class="panel-switcher-btn" id="switcher-info" type="button" data-active="false">Info</button>
+      <button class="panel-switcher-btn" id="switcher-chat" type="button" data-active="false">Chat</button>
+    </div>
     <div class="gateway-category-menu hidden" id="gateway-category-menu" aria-hidden="true"></div>
     <aside class="menu-panel" aria-label="Quick resource menu">
       <div class="menu-panel-head">
@@ -2144,7 +2469,10 @@
             <button class="meta-toggle" id="toggle-locale" type="button">EN / 中</button>
             <button class="meta-toggle" id="toggle-debug" type="button">Debug</button>
           </div>
-          <button class="meta-toggle" id="toggle-actor-skin" type="button">Claw</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="meta-toggle" id="toggle-actor-skin" type="button">Claw</button>
+            <button class="archive-hide-btn" id="archive-hide-btn" type="button">Hide</button>
+          </div>
         </div>
       </div>
       <div class="resource-menu" id="resource-menu"></div>
@@ -2203,6 +2531,234 @@
         <div class="preview-modal-body" id="preview-modal-body"></div>
       </div>
     </div>
+    <button class="archive-show-tab" id="archive-show-tab" type="button">Show Archive</button>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+    /* ── Panel Switcher + Live Chat ────────────────────────────────── */
+    (function () {
+      var CHAT_KEY = 'clawlibrary-chat-visible';
+      var INFO_KEY = 'clawlibrary-info-panel-visible-v1';
+      var PANEL_KEY = 'clawlibrary-active-panel';
+      var POLL_MS = 2500;
+
+      var chatPanel    = document.getElementById('hud-chat');
+      var chatMessages = document.getElementById('hud-chat-messages');
+      var switcherInfo = document.getElementById('switcher-info');
+      var switcherChat = document.getElementById('switcher-chat');
+      var infoToggle   = document.getElementById('toggle-info-panel');
+
+      var activePanel = 'none';
+      var lastMsgCount = 0;
+      var expandedSet = new Set();
+      var lastMessages = [];
+
+      function fmtTime(iso) {
+        if (!iso) return '';
+        try {
+          var d = new Date(iso);
+          return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        } catch(e) { return ''; }
+      }
+      function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      function buildBubbleHTML(msg, i) {
+        var isUser = msg.role === 'user';
+        var isExpanded = expandedSet.has(i);
+        var expandBtn = !isUser
+          ? '<button class="chat-bubble-expand" data-idx="' + i + '">' + (isExpanded ? '▲ less' : '▼ more') + '</button>'
+          : '';
+        return '<div class="chat-bubble' + (isExpanded ? ' expanded' : '') + '" data-role="' + msg.role + '" data-idx="' + i + '">'
+          + '<div class="chat-bubble-meta">'
+          + '<span class="chat-bubble-name">' + esc(msg.senderName) + '</span>'
+          + '<span class="chat-bubble-time">' + fmtTime(msg.timestamp) + '</span>'
+          + '</div>'
+          + '<div class="chat-bubble-text">' + esc(msg.text) + '</div>'
+          + expandBtn + '</div>';
+      }
+
+      function attachExpandListeners(container) {
+        container.querySelectorAll('.chat-bubble-expand').forEach(function(btn) {
+          btn.addEventListener('click', function(e) {
+            var idx = parseInt(e.currentTarget.getAttribute('data-idx'), 10);
+            if (expandedSet.has(idx)) expandedSet.delete(idx); else expandedSet.add(idx);
+            renderMessages(lastMessages);
+          });
+        });
+      }
+
+      function fullRenderMessages(messages) {
+        chatMessages.innerHTML = messages.map(function(msg, i) {
+          return buildBubbleHTML(msg, i);
+        }).join('');
+        attachExpandListeners(chatMessages);
+      }
+
+      function renderMessages(messages) {
+        if (!chatMessages) return;
+        var prevMessages = lastMessages;
+        lastMessages = messages;
+        var atBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 40;
+
+        if (messages.length < lastMsgCount) {
+          // History cleared — full re-render
+          fullRenderMessages(messages);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          lastMsgCount = messages.length;
+          return;
+        }
+
+        if (messages.length === lastMsgCount) {
+          // Same count — check if last message changed (streaming update)
+          if (messages.length > 0) {
+            var lastIdx = messages.length - 1;
+            var prevText = prevMessages.length > 0 ? prevMessages[lastIdx].text : null;
+            var newText = messages[lastIdx].text;
+            if (prevText !== newText) {
+              // Update only the last bubble's text in-place
+              var lastBubble = chatMessages.querySelector('.chat-bubble[data-idx="' + lastIdx + '"]');
+              if (lastBubble) {
+                var textEl = lastBubble.querySelector('.chat-bubble-text');
+                if (textEl) textEl.innerHTML = esc(newText);
+              } else {
+                // Bubble not found — fall back to full re-render
+                fullRenderMessages(messages);
+              }
+              if (atBottom) chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+          }
+          lastMsgCount = messages.length;
+          return;
+        }
+
+        // messages.length > lastMsgCount — append new messages only
+        var newMessages = messages.slice(lastMsgCount);
+        var frag = document.createDocumentFragment();
+        var tmp = document.createElement('div');
+        tmp.innerHTML = newMessages.map(function(msg, j) {
+          return buildBubbleHTML(msg, lastMsgCount + j);
+        }).join('');
+        while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+        chatMessages.appendChild(frag);
+        attachExpandListeners(chatMessages);
+        if (atBottom || lastMsgCount === 0) chatMessages.scrollTop = chatMessages.scrollHeight;
+        lastMsgCount = messages.length;
+      }
+
+      async function pollChat() {
+        if (activePanel !== 'chat') return;
+        try {
+          var res = await fetch('/api/openclaw/chat', { cache: 'no-store' });
+          if (!res.ok) return;
+          var data = await res.json();
+          if (data.ok && Array.isArray(data.messages)) renderMessages(data.messages);
+        } catch(e) {}
+      }
+
+      function applyPanel(panel, save) {
+        activePanel = panel;
+        var showChat = panel === 'chat';
+        var showInfo = panel === 'info';
+
+        document.body.classList.toggle('chat-hidden', !showChat);
+        if (chatPanel) chatPanel.setAttribute('aria-hidden', showChat ? 'false' : 'true');
+        document.body.classList.toggle('info-collapsed', !showInfo);
+
+        if (switcherInfo) switcherInfo.setAttribute('data-active', showInfo ? 'true' : 'false');
+        if (switcherChat) switcherChat.setAttribute('data-active', showChat ? 'true' : 'false');
+
+        if (infoToggle) {
+          infoToggle.textContent = showInfo ? 'Hide Info' : 'Show Info';
+          infoToggle.setAttribute('aria-pressed', showInfo ? 'true' : 'false');
+        }
+
+        if (save) {
+          try {
+            localStorage.setItem(PANEL_KEY, panel);
+            localStorage.setItem(CHAT_KEY, showChat ? '1' : '0');
+            localStorage.setItem(INFO_KEY, showInfo ? '1' : '0');
+          } catch(e) {}
+        }
+        if (showChat) pollChat();
+      }
+
+      if (switcherInfo) {
+        switcherInfo.addEventListener('click', function() {
+          applyPanel(activePanel === 'info' ? 'none' : 'info', true);
+        });
+      }
+      if (switcherChat) {
+        switcherChat.addEventListener('click', function() {
+          applyPanel(activePanel === 'chat' ? 'none' : 'chat', true);
+        });
+      }
+
+      (function restore() {
+        var saved = 'none';
+        try { saved = localStorage.getItem(PANEL_KEY) || 'none'; } catch(e) {}
+        if (saved === 'none') {
+          try {
+            if (localStorage.getItem(CHAT_KEY) === '1') saved = 'chat';
+            else if (localStorage.getItem(INFO_KEY) === '1') saved = 'info';
+          } catch(e) {}
+        }
+        applyPanel(saved, false);
+      })();
+
+      setInterval(pollChat, POLL_MS);
+    })();
+    </script>
+    <script>
+      (function () {
+        var STORAGE_KEY = 'clawlibrary-archive-visible';
+        var hideBtn = document.getElementById('archive-hide-btn');
+        var showTab = document.getElementById('archive-show-tab');
+
+        function applyState(collapsed, animate) {
+          if (!animate) {
+            // Disable transitions momentarily for instant restore on load
+            var panel = document.querySelector('.menu-panel');
+            var tab = document.getElementById('archive-show-tab');
+            if (panel) panel.style.transition = 'none';
+            if (tab) tab.style.transition = 'none';
+          }
+          if (collapsed) {
+            document.body.classList.add('archive-collapsed');
+          } else {
+            document.body.classList.remove('archive-collapsed');
+          }
+          if (!animate) {
+            void document.body.offsetHeight;
+            var panel = document.querySelector('.menu-panel');
+            var tab = document.getElementById('archive-show-tab');
+            if (panel) panel.style.transition = '';
+            if (tab) tab.style.transition = '';
+          }
+          // Notify Phaser of canvas resize after CSS transition completes
+          setTimeout(function() { window.dispatchEvent(new Event('resize')); }, animate ? 320 : 0);
+
+          try {
+            localStorage.setItem(STORAGE_KEY, collapsed ? '0' : '1');
+          } catch (e) {}
+        }
+
+        // Restore saved preference immediately (no animation on load)
+        try {
+          var saved = localStorage.getItem(STORAGE_KEY);
+          if (saved === '0') {
+            applyState(true, false);
+          }
+        } catch (e) {}
+
+        hideBtn.addEventListener('click', function () {
+          applyState(true, true);
+        });
+
+        showTab.addEventListener('click', function () {
+          applyState(false, true);
+        });
+      })();
+    </script>
   </body>
 </html>
