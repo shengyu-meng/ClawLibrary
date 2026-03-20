@@ -2893,8 +2893,8 @@ async function refreshTelemetry(): Promise<void> {
           activeScene.despawnAgentActor(prevId);
         }
       }
+      prevActiveAgentIds = currentAgentIds;
     }
-    prevActiveAgentIds = currentAgentIds;
 
     ensureSceneBindings();
     syncResourceControls();
