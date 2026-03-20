@@ -1669,9 +1669,9 @@ async function buildLiveResources({ itemResourceIds = null, includeExcerpt = tru
   const agentRunCount = subagentRuns && typeof subagentRuns.runs === 'object' ? Object.keys(subagentRuns.runs).length : 0;
   const activeAgents = subagentRuns && typeof subagentRuns.runs === 'object'
     ? Object.entries(subagentRuns.runs)
-        .filter(([, run]) => run && run.status === 'running')
+        .filter(([, run]) => run && !run.endedAt && !run.outcome)
         .slice(0, 6)
-        .map(([id, run]) => ({ id, label: run.label ?? id, status: 'running' }))
+        .map(([id, run]) => ({ id, label: run.label ?? run.task?.slice(0, 40) ?? id, status: 'running' }))
     : [];
   const mainSessionIndexPath = path.join(OPENCLAW_ROOT, 'agents', 'main', 'sessions', 'sessions.json');
   const codexSessionIndexPath = path.join(OPENCLAW_ROOT, 'agents', 'codex', 'sessions', 'sessions.json');
