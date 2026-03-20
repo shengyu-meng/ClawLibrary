@@ -352,13 +352,24 @@ export class LibraryScene extends Phaser.Scene {
       return;
     }
 
-    // Pick a start node different from the primary actor's position
-    const usableNodes = nodes.filter((node) => {
-      const dx = node.x - this.lobster.x;
-      const dy = node.y - this.lobster.y;
-      return Math.hypot(dx, dy) > 80;
-    });
-    const startNode = usableNodes[Math.floor(Math.random() * usableNodes.length)] ?? nodes[0];
+    // exec-processes spawn inside the break_room (bottom-right room — Run Dock / Documents Archive)
+    // subagents pick any node far from the primary actor
+    let startNode = nodes[0];
+    if (kind === 'exec-process') {
+      const breakRoom = this.protocols.mapLogic.rooms.find((r) => r.id === 'break_room');
+      if (breakRoom) {
+        const [rx, ry, rw, rh] = breakRoom.bounds;
+        const roomNodes = nodes.filter((n) => n.x >= rx && n.x <= rx + rw && n.y >= ry && n.y <= ry + rh);
+        startNode = roomNodes[Math.floor(Math.random() * roomNodes.length)] ?? nodes[0];
+      }
+    } else {
+      const usableNodes = nodes.filter((node) => {
+        const dx = node.x - this.lobster.x;
+        const dy = node.y - this.lobster.y;
+        return Math.hypot(dx, dy) > 80;
+      });
+      startNode = usableNodes[Math.floor(Math.random() * usableNodes.length)] ?? nodes[0];
+    }
 
     const children: Phaser.GameObjects.GameObject[] = [];
     const actor = this.protocols.sceneArt.actor;
@@ -456,6 +467,9 @@ export class LibraryScene extends Phaser.Scene {
     this.agentActors.splice(index, 1);
   }
 
+  // Rooms considered "bottom floor" — exec-processes wander freely inside these
+  private readonly BOTTOM_ROOM_IDS: ReadonlyArray<string> = ['document', 'agent', 'break_room'];
+
   private advanceAgentActor(actor: AgentActor, deltaMs: number): void {
     // Update name tag position
     if (actor.nameTag) {
@@ -478,15 +492,27 @@ export class LibraryScene extends Phaser.Scene {
         }
       }
 
-      const allZones = this.protocols.mapLogic.workZones.filter((zone) => !claimedZones.has(zone.id));
+      // exec-processes roam only inside the bottom-floor rooms (break_room / document / agent)
+      // subagents roam wherever their focusZoneId points, or all zones
+      const candidateZones = actor.kind === 'exec-process'
+        ? this.protocols.mapLogic.workZones.filter(
+            (zone) => this.BOTTOM_ROOM_IDS.includes(zone.id) && !claimedZones.has(zone.id)
+          )
+        : this.protocols.mapLogic.workZones.filter((zone) => !claimedZones.has(zone.id));
+
+      const allZones = candidateZones.length > 0
+        ? candidateZones
+        : (actor.kind === 'exec-process'
+            ? this.protocols.mapLogic.workZones.filter((zone) => this.BOTTOM_ROOM_IDS.includes(zone.id))
+            : this.protocols.mapLogic.workZones);
 
       if (allZones.length === 0) {
         return;
       }
 
-      // If actor has a focus zone, route there; otherwise pick next in rotation
+      // subagents: if they have a focusZoneId, always route there first
       const focusZone = actor.focusZoneId
-        ? allZones.find((z) => z.id === actor.focusZoneId) ?? allZones[actor.workCursor % allZones.length]
+        ? (allZones.find((z) => z.id === actor.focusZoneId) ?? allZones[actor.workCursor % allZones.length])
         : allZones[actor.workCursor % allZones.length];
 
       const zone = focusZone;
@@ -515,7 +541,8 @@ export class LibraryScene extends Phaser.Scene {
     }
 
     const target = actor.route[0];
-    const speedPerMs = actor.kind === 'exec-process' ? 0.10 : 0.28;
+    // exec-processes: slow drift (they're background tasks). subagents: calm walk.
+    const speedPerMs = actor.kind === 'exec-process' ? 0.055 : 0.14;
     const step = speedPerMs * deltaMs;
     const dx = target.x - actor.container.x;
     const dy = target.y - actor.container.y;
