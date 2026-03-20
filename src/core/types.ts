@@ -357,6 +357,13 @@ export type ActiveAgent = {
   status: string;
 };
 
+export type ActiveExecProcess = {
+  id: string;
+  label: string;
+  command: string;
+  status: 'running' | 'completed' | 'failed';
+};
+
 export type OpenClawSnapshot = {
   mode: 'live' | 'mock';
   generatedAt: string;
@@ -364,4 +371,5 @@ export type OpenClawSnapshot = {
   recentEvents: OpenClawAccessEvent[];
   focus: OpenClawFocus;
   activeAgents?: ActiveAgent[];
+  activeProcesses?: ActiveExecProcess[];
 };

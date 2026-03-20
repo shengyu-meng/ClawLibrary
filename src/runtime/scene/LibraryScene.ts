@@ -83,9 +83,12 @@ type ResourceSelectEvent = {
   anchor?: Point;
 };
 
+type AgentActorKind = 'subagent' | 'exec-process';
+
 type AgentActor = {
   id: string;
   label: string;
+  kind: AgentActorKind;
   container: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Sprite | Phaser.GameObjects.Arc | null;
   route: Point[];
@@ -339,7 +342,7 @@ export class LibraryScene extends Phaser.Scene {
     this.maybeProcessTelemetryQueue();
   }
 
-  public spawnAgentActor(runId: string, label: string): void {
+  public spawnAgentActor(runId: string, label: string, kind: AgentActorKind = 'subagent'): void {
     if (this.agentActors.some((actor) => actor.id === runId)) {
       return;
     }
@@ -367,17 +370,25 @@ export class LibraryScene extends Phaser.Scene {
       children.push(shadow);
     }
 
+    // Visual style: subagents = cool blue tint, exec-processes = warm amber tint (smaller, slower)
+    const isExecProcess = kind === 'exec-process';
+    const scaleFactor = isExecProcess ? 0.72 : 0.88;
+    const tintColor = isExecProcess ? 0xffd080 : 0xaad4ff;
+    const fallbackColor = isExecProcess ? 0xe8a830 : 0x4fa8e8;
+    const nameTagColor = isExecProcess ? '#ffe4a0' : '#b8d8ff';
+    const nameTagBg = isExecProcess ? 'rgba(28, 18, 4, 0.76)' : 'rgba(4, 12, 28, 0.72)';
+    const nameTagPrefix = isExecProcess ? '⚙ ' : '';
+
     let body: Phaser.GameObjects.Sprite | Phaser.GameObjects.Arc | null = null;
     if (actor && variant && idleVisual) {
       const sprite = this.add.sprite(actor.anchorOffset?.x ?? 0, actor.anchorOffset?.y ?? 0, idleVisual.textureKey);
-      sprite.setDisplaySize(actor.displaySize.width * 0.88, actor.displaySize.height * 0.88);
-      // Cool tint to differentiate from primary
-      sprite.setTint(0xaad4ff);
+      sprite.setDisplaySize(actor.displaySize.width * scaleFactor, actor.displaySize.height * scaleFactor);
+      sprite.setTint(tintColor);
       children.push(sprite);
       body = sprite;
     } else {
-      const fallback = this.add.circle(0, 0, 14, 0x4fa8e8, 1);
-      fallback.setStrokeStyle(2, 0x0a1a2e, 0.8);
+      const fallback = this.add.circle(0, 0, isExecProcess ? 11 : 14, fallbackColor, 1);
+      fallback.setStrokeStyle(2, isExecProcess ? 0x2a1800 : 0x0a1a2e, 0.8);
       children.push(fallback);
       body = fallback;
     }
@@ -388,12 +399,12 @@ export class LibraryScene extends Phaser.Scene {
     this.tweens.add({ targets: container, alpha: 1, duration: 600, ease: 'Sine.Out' });
 
     // Floating name tag
-    const shortLabel = label.slice(0, 10);
+    const shortLabel = `${nameTagPrefix}${label.slice(0, 14)}`;
     const nameTag = this.add.text(startNode.x, startNode.y - 36, shortLabel, {
-      color: '#b8d8ff',
+      color: nameTagColor,
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '10px',
-      backgroundColor: 'rgba(4, 12, 28, 0.72)',
+      backgroundColor: nameTagBg,
       padding: { left: 5, right: 5, top: 3, bottom: 3 }
     });
     nameTag.setOrigin(0.5, 1);
@@ -402,6 +413,7 @@ export class LibraryScene extends Phaser.Scene {
     const agentActor: AgentActor = {
       id: runId,
       label,
+      kind,
       container,
       body,
       route: [],
@@ -485,7 +497,7 @@ export class LibraryScene extends Phaser.Scene {
     }
 
     const target = actor.route[0];
-    const speedPerMs = 0.28;
+    const speedPerMs = actor.kind === 'exec-process' ? 0.10 : 0.28;
     const step = speedPerMs * deltaMs;
     const dx = target.x - actor.container.x;
     const dy = target.y - actor.container.y;

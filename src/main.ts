@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import appConfig from '../clawlibrary.config.json';
 import { LibraryScene } from './runtime/scene/LibraryScene';
-import type { GrowthState, OpenClawResourceItem, OpenClawSnapshot, ResourcePartitionId } from './core/types';
+import type { ActiveExecProcess, GrowthState, OpenClawResourceItem, OpenClawSnapshot, ResourcePartitionId } from './core/types';
 import type { UiLocale } from './ui/locale';
 import { resourceLabel, uiText } from './ui/locale';
 import { PARTITION_CSS_COLORS } from './ui/palette';
@@ -188,6 +188,7 @@ type DebugPoint = {
 
 let lastSnapshot: OpenClawSnapshot | null = null;
 let prevActiveAgentIds = new Set<string>();
+let prevActiveProcessIds = new Set<string>();
 const resourceDetailItemsById = new Map<ResourcePartitionId, OpenClawResourceItem[]>();
 const resourceDetailLoadedById = new Set<ResourcePartitionId>();
 const resourceDetailRequestsById = new Map<ResourcePartitionId, Promise<void>>();
@@ -2882,13 +2883,13 @@ async function refreshTelemetry(): Promise<void> {
     const activeScene = getActiveScene();
     activeScene?.applyTelemetrySnapshot(lastSnapshot);
 
-    // Diff activeAgents to spawn/despawn secondary actors
+    // Diff activeAgents to spawn/despawn secondary actors (subagents)
     const currentAgents = lastSnapshot.activeAgents ?? [];
     const currentAgentIds = new Set(currentAgents.map((agent) => agent.id));
     if (activeScene) {
       for (const agent of currentAgents) {
         if (!prevActiveAgentIds.has(agent.id)) {
-          activeScene.spawnAgentActor(agent.id, agent.label);
+          activeScene.spawnAgentActor(agent.id, agent.label, 'subagent');
         }
       }
       for (const prevId of prevActiveAgentIds) {
@@ -2898,6 +2899,35 @@ async function refreshTelemetry(): Promise<void> {
       }
       prevActiveAgentIds = currentAgentIds;
     }
+
+    // Diff activeProcesses to spawn/despawn exec-process actors (amber capys, slow)
+    void (async () => {
+      try {
+        const procResponse = await fetch('/api/openclaw/processes', { cache: 'no-store' });
+        if (!procResponse.ok) return;
+        const procData = (await procResponse.json()) as { ok: boolean; processes: ActiveExecProcess[] };
+        if (!procData.ok) return;
+        const currentProcesses = procData.processes.filter((p) => p.status === 'running');
+        const currentProcIds = new Set(currentProcesses.map((p) => p.id));
+        const sceneReady = getActiveScene();
+        if (sceneReady) {
+          for (const proc of currentProcesses) {
+            if (!prevActiveProcessIds.has(proc.id)) {
+              // Use a process-scoped id to avoid collision with subagent ids
+              sceneReady.spawnAgentActor(`proc:${proc.id}`, proc.label, 'exec-process');
+            }
+          }
+          for (const prevId of prevActiveProcessIds) {
+            if (!currentProcIds.has(prevId)) {
+              sceneReady.despawnAgentActor(`proc:${prevId}`);
+            }
+          }
+          prevActiveProcessIds = currentProcIds;
+        }
+      } catch {
+        // ignore — process endpoint is best-effort
+      }
+    })();
 
     ensureSceneBindings();
     syncResourceControls();

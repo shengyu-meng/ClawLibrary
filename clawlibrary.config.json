@@ -1,10 +1,10 @@
 {
   "openclaw": {
-    "home": "",
-    "workspace": ""
+    "home": "/Users/marcuss/.openclaw",
+    "workspace": "/Users/marcuss/.openclaw/workspace"
   },
   "server": {
-    "host": "127.0.0.1",
+    "host": "0.0.0.0",
     "port": 5173
   },
   "ui": {
