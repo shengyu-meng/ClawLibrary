@@ -758,6 +758,12 @@ function saveLocale(): void {
 
 function loadInfoPanelPreference(): void {
   try {
+    // If Chat panel is saved as visible, Info must be hidden (mutually exclusive)
+    const chatSaved = localStorage.getItem('clawlibrary-chat-visible');
+    if (chatSaved === '1') {
+      infoPanelVisible = false;
+      return;
+    }
     const saved = localStorage.getItem(INFO_PANEL_STORAGE_KEY);
     if (saved === '0') {
       infoPanelVisible = false;
@@ -2009,6 +2015,13 @@ function syncInfoTogglePosition(): void {
   if (!toggleInfoPanelButton) {
     return;
   }
+  // If Chat panel is active, hide the Info toggle entirely — no overlap
+  const chatActive = localStorage.getItem('clawlibrary-chat-visible') === '1';
+  if (chatActive) {
+    toggleInfoPanelButton.style.visibility = 'hidden';
+    return;
+  }
+  toggleInfoPanelButton.style.visibility = '';
   if (!infoPanelVisible) {
     toggleInfoPanelButton.style.bottom = '18px';
     return;

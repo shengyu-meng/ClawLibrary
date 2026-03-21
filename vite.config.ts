@@ -509,6 +509,21 @@ function telemetryMiddleware() {
       return;
     }
 
+    if (req.url?.startsWith('/api/openclaw/chat') && req.method === 'GET') {
+      try {
+        const messages = await readChatMessages();
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(JSON.stringify({ ok: true, messages }));
+      } catch (error) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      }
+      return;
+    }
+
     if (!req.url?.startsWith('/api/openclaw/snapshot')) {
       next();
       return;
@@ -546,6 +561,202 @@ function telemetryMiddleware() {
   };
 }
 
+// ── Live Chat endpoint ──────────────────────────────────────────────────────
+
+const SESSIONS_DIR = path.join(clawlibraryConfig.openclaw.home, 'agents', 'main', 'sessions');
+const CHAT_MAX_MESSAGES = 30;
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  senderName: string;
+  timestamp: string;
+}
+
+function extractSenderName(rawText: string): string {
+  // Parse the Sender (untrusted metadata) block for "name" field
+  const match = rawText.match(/Sender \(untrusted metadata\)[^`]*```json\s*(\{[^`]+\})/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]) as Record<string, string>;
+      const full = parsed.name || parsed.label || '';
+      // Truncate to first name only (up to first space)
+      const firstName = full.split(' ')[0];
+      if (firstName) return firstName;
+    } catch { /* ignore */ }
+  }
+  return 'User';
+}
+
+function cleanUserText(rawText: string): string {
+  // Remove Conversation info block
+  let text = rawText.replace(/Conversation info \(untrusted metadata\)[^\n]*\n```json[\s\S]*?```\n?/g, '');
+  // Remove Sender block
+  text = text.replace(/Sender \(untrusted metadata\)[^\n]*\n```json[\s\S]*?```\n?/g, '');
+  // Remove Replied message block
+  text = text.replace(/Replied message \(untrusted, for context\)[^\n]*\n```json[\s\S]*?```\n?/g, '');
+  // Remove To send an image back instructions
+  text = text.replace(/To send an image back[^\n]*\n?/g, '');
+  // Remove System: lines
+  text = text.replace(/^System:.*$/gm, '');
+  // Remove [Queued messages while agent was busy] wrapper
+  text = text.replace(/\[Queued messages while agent was busy\][\s\S]*?---\s*Queued #\d+\s*/g, '');
+  // Remove [media attached: ...] lines
+  text = text.replace(/\[media attached:[^\]]*\]\s*/g, '');
+  // Mark <media:audio> tags as placeholder (will be replaced by transcription)
+  text = text.replace(/<media:[^>]+>/g, '[audio]');
+  // If only media attachment line was present, mark as audio too
+  if (!text && rawText.includes('media attached')) text = '[audio]';
+  return text.trim();
+}
+
+function extractSonioxTranscription(toolResultText: string): string | null {
+  // Try each { ... } block by finding balanced braces
+  let i = 0;
+  while (i < toolResultText.length) {
+    const start = toolResultText.indexOf('{', i);
+    if (start === -1) break;
+    let depth = 0;
+    let end = -1;
+    for (let k = start; k < toolResultText.length; k++) {
+      if (toolResultText[k] === '{') depth++;
+      else if (toolResultText[k] === '}') {
+        depth--;
+        if (depth === 0) { end = k; break; }
+      }
+    }
+    if (end === -1) break;
+    const jsonStr = toolResultText.slice(start, end + 1);
+    try {
+      const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+      // Soniox transcript response has "text" (string) + "tokens" (array) + "id"
+      if (
+        typeof parsed.text === 'string' &&
+        parsed.text.trim().length > 5 &&
+        (Array.isArray(parsed.tokens) || typeof parsed.id === 'string')
+      ) {
+        return parsed.text.trim();
+      }
+    } catch { /* skip */ }
+    i = end + 1;
+  }
+  return null;
+}
+
+async function readChatMessages(): Promise<ChatMessage[]> {
+  let files: string[] = [];
+  try {
+    const entries = await fs.readdir(SESSIONS_DIR);
+    files = entries
+      .filter((f) => f.endsWith('.jsonl') && !f.includes('.reset') && !f.includes('.deleted'))
+      .map((f) => path.join(SESSIONS_DIR, f));
+  } catch { return []; }
+
+  if (files.length === 0) return [];
+
+  // Find most recently modified session file
+  const stats = await Promise.all(files.map(async (f) => ({ f, mtime: (await fs.stat(f)).mtimeMs })));
+  stats.sort((a, b) => b.mtime - a.mtime);
+  const activeFile = stats[0].f;
+
+  const raw = await fs.readFile(activeFile, 'utf8');
+  const lines = raw.split('\n').filter(Boolean);
+
+  // Parse all entries first so we can look ahead for transcriptions
+  type Entry = {
+    timestamp?: string;
+    message?: { role?: string; content?: unknown; toolCallId?: string };
+  };
+  const entries: Entry[] = [];
+  for (const line of lines) {
+    try { entries.push(JSON.parse(line) as Entry); } catch { /* skip */ }
+  }
+
+  const messages: ChatMessage[] = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    const obj = entries[i];
+    const msg = obj.message;
+    if (!msg) continue;
+    const role = msg.role;
+    if (role !== 'user' && role !== 'assistant') continue;
+
+    let rawText = '';
+    const content = msg.content;
+    if (typeof content === 'string') {
+      rawText = content;
+    } else if (Array.isArray(content)) {
+      for (const c of content as Array<{ type?: string; text?: string }>) {
+        if (c.type === 'text' && c.text) { rawText = c.text; break; }
+      }
+    }
+    if (!rawText.trim()) continue;
+
+    if (role === 'user') {
+      const senderName = extractSenderName(rawText);
+      let text = cleanUserText(rawText);
+      if (!text) continue;
+
+      // If message had audio, look ahead for Soniox transcription in toolResults
+      if (text.includes('[audio]')) {
+        for (let j = i + 1; j < Math.min(i + 25, entries.length); j++) {
+          const nextMsg = entries[j].message;
+          if (!nextMsg) continue;
+          // Stop if we hit another user message
+          if (nextMsg.role === 'user') break;
+
+          if (nextMsg.role === 'toolResult') {
+            const nc = nextMsg.content;
+            const toolTexts: string[] = [];
+            if (Array.isArray(nc)) {
+              for (const c of nc as Array<{ type?: string; text?: string }>) {
+                if (c.type === 'text' && c.text) toolTexts.push(c.text);
+              }
+            } else if (typeof nc === 'string') {
+              toolTexts.push(nc);
+            }
+
+            for (const t of toolTexts) {
+              // Strategy 1: structured Soniox JSON with "text" + "tokens"/"id"
+              const structured = extractSonioxTranscription(t);
+              if (structured) {
+                text = text.replace('[audio]', `🎙 "${structured}"`);
+                break;
+              }
+              // Strategy 2: plain text toolResult that looks like a transcription
+              // (non-empty, no shell output markers, reasonable length, not a path/error)
+              const trimmed = t.trim();
+              if (
+                trimmed.length > 10 &&
+                trimmed.length < 1000 &&
+                !trimmed.startsWith('{') &&
+                !trimmed.startsWith('/') &&
+                !trimmed.includes('FILE_ID') &&
+                !trimmed.includes('TX_ID') &&
+                !trimmed.includes('Successfully') &&
+                !trimmed.includes('\n') // single line = likely transcription
+              ) {
+                text = text.replace('[audio]', `🎙 "${trimmed}"`);
+                break;
+              }
+            }
+            if (!text.includes('[audio]')) break;
+          }
+        }
+      }
+
+      messages.push({ role: 'user', text, senderName, timestamp: obj.timestamp ?? '' });
+    } else {
+      const text = rawText.trim();
+      if (!text) continue;
+      messages.push({ role: 'assistant', text, senderName: 'ClawBot', timestamp: obj.timestamp ?? '' });
+    }
+  }
+
+  // Return last N messages
+  return messages.slice(-CHAT_MAX_MESSAGES);
+}
+
 export default defineConfig({
   plugins: [
     {
@@ -563,6 +774,7 @@ export default defineConfig({
   },
   server: {
     host: clawlibraryConfig.server.host,
-    port: clawlibraryConfig.server.port
+    port: clawlibraryConfig.server.port,
+    strictPort: true
   }
 });

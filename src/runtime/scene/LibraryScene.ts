@@ -1666,7 +1666,7 @@ export class LibraryScene extends Phaser.Scene {
 
     // Context bar — lives inside the lobster container, drawn above the sprite
     this.lobsterContextBar = this.add.graphics();
-    this.lobsterContextBar.setRotation(-5 * (Math.PI / 180)); // level the bar (~-5 deg)
+    this.lobsterContextBar.setRotation(0); // perfectly horizontal
     this.lobster.add(this.lobsterContextBar);
     this.drawContextBar(1); // starts full/green
   }
