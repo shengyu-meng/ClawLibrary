@@ -430,7 +430,7 @@ export class LibraryScene extends Phaser.Scene {
     const nameTag = this.add.text(startNode.x, startNode.y - 36, shortLabel, {
       color: nameTagColor,
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '10px',
+      fontSize: '13px',
       backgroundColor: nameTagBg,
       padding: { left: 5, right: 5, top: 3, bottom: 3 }
     });
@@ -573,7 +573,7 @@ export class LibraryScene extends Phaser.Scene {
 
     const target = actor.route[0];
     // exec-processes: slow drift (they're background tasks). subagents: calm walk.
-    const speedPerMs = actor.kind === 'exec-process' ? 0.055 : 0.14;
+    const speedPerMs = actor.kind === 'exec-process' ? 0.055 : 0.098;
     const step = speedPerMs * deltaMs;
     const dx = target.x - actor.container.x;
     const dy = target.y - actor.container.y;
@@ -1666,6 +1666,7 @@ export class LibraryScene extends Phaser.Scene {
 
     // Context bar — lives inside the lobster container, drawn above the sprite
     this.lobsterContextBar = this.add.graphics();
+    this.lobsterContextBar.setRotation(-5 * (Math.PI / 180)); // level the bar (~-5 deg)
     this.lobster.add(this.lobsterContextBar);
     this.drawContextBar(1); // starts full/green
   }
