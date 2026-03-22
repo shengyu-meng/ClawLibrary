@@ -3044,9 +3044,17 @@
 
           // Main agent card
           var mainCtx = snapshot.mainActorContext || {};
-          var hp = mainCtx.contextRemaining != null ? Math.round(mainCtx.contextRemaining * 100) : null;
+          // remaining = fraction of context left (0.0 = full, 1.0 = empty)
+          var remaining = mainCtx.remaining != null ? mainCtx.remaining : null;
+          var tokens = mainCtx.tokens || 0;
+          var maxTokens = mainCtx.maxTokens || 200000;
+          var usedPct = remaining != null ? Math.round((1 - remaining) * 100) : null;
+          var remainPct = remaining != null ? Math.round(remaining * 100) : null;
           var mainFocus = snapshot.focus || {};
           var mainStatus = mainFocus.detail || mainCtx.detail || 'Ready';
+
+          // HP bar color: green > 40%, yellow 20-40%, red < 20%
+          var hpColor = remainPct > 40 ? '#64d7b0,#9df0cf' : remainPct > 20 ? '#ffbe6a,#ffd27f' : '#ff7b7b,#ffb1b1';
 
           cards.push(
             '<div class="mobile-agent-card main">'
@@ -3054,10 +3062,15 @@
             + '<span class="mobile-agent-name">🦞 ClawBot</span>'
             + '<span class="mobile-agent-badge">Active</span>'
             + '</div>'
-            + (hp != null ? (
+            + (remainPct != null ? (
               '<div class="mobile-agent-hp">'
-              + '<div class="mobile-agent-hp-bar"><div class="mobile-agent-hp-fill" style="width:' + hp + '%"></div></div>'
-              + '<span class="mobile-agent-hp-text">' + hp + '%</span>'
+              + '<div class="mobile-agent-hp-bar"><div class="mobile-agent-hp-fill" style="width:' + remainPct + '%;background:linear-gradient(90deg,' + hpColor + ')"></div></div>'
+              + '<span class="mobile-agent-hp-text">' + remainPct + '%</span>'
+              + '</div>'
+              + '<div class="mobile-agent-meta">'
+              + '<div class="mobile-agent-meta-item"><span class="mobile-agent-meta-value">' + Math.round(tokens/1000) + 'k</span><span class="mobile-agent-meta-label">Tokens used</span></div>'
+              + '<div class="mobile-agent-meta-item"><span class="mobile-agent-meta-value">' + Math.round(maxTokens/1000) + 'k</span><span class="mobile-agent-meta-label">Max</span></div>'
+              + '<div class="mobile-agent-meta-item"><span class="mobile-agent-meta-value">' + usedPct + '%</span><span class="mobile-agent-meta-label">Used</span></div>'
               + '</div>'
             ) : '')
             + '<div class="mobile-agent-status">'
