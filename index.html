@@ -2402,19 +2402,41 @@
           display: none !important;
         }
 
-        /* Reposition panel switcher and info/chat below agent cards */
+        /* Reposition panel switcher centered at bottom */
         .panel-switcher {
           left: 50%;
           transform: translateX(-50%);
           bottom: 12px;
         }
 
+        /* Hide desktop info HUD on mobile — agents cards replace it */
         .hud-activity {
           display: none !important;
         }
 
+        /* Mobile chat: render below agents cards, inside the mobile-agents container */
         .hud-chat {
-          display: none !important;
+          position: static !important;
+          width: 100% !important;
+          max-width: none !important;
+          max-height: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+          pointer-events: auto !important;
+          display: none;
+        }
+
+        body.mobile-chat-active .hud-chat {
+          display: flex !important;
+        }
+
+        body.mobile-chat-active .hud-chat .hud-chat-messages {
+          max-height: 50vh;
+        }
+
+        /* When chat is active on mobile, keep agents visible above */
+        body.mobile-chat-active .mobile-agents {
+          bottom: 60px;
         }
       }
 
@@ -2863,16 +2885,55 @@
         } catch(e) {}
       }
 
+      function isMobileView() {
+        return window.matchMedia('(max-width: 768px)').matches;
+      }
+
       function applyPanel(panel, save) {
         activePanel = panel;
         var showChat = panel === 'chat';
         var showInfo = panel === 'info';
+        var mobile = isMobileView();
 
         document.body.classList.toggle('chat-hidden', !showChat);
         if (chatPanel) chatPanel.setAttribute('aria-hidden', showChat ? 'false' : 'true');
         document.body.classList.toggle('info-collapsed', !showInfo);
 
-        if (switcherInfo) switcherInfo.setAttribute('data-active', showInfo ? 'true' : 'false');
+        // Mobile: move chat panel into mobile-agents container when active
+        var mobileContainer = document.getElementById('mobile-agents');
+        if (mobile && showChat && mobileContainer && chatPanel) {
+          document.body.classList.add('mobile-chat-active');
+          // Move chat panel to end of mobile-agents if not already there
+          if (chatPanel.parentNode !== mobileContainer) {
+            mobileContainer.appendChild(chatPanel);
+          }
+          // Scroll chat to bottom
+          if (chatMessages) {
+            setTimeout(function() { chatMessages.scrollTop = chatMessages.scrollHeight; }, 100);
+          }
+        } else {
+          document.body.classList.remove('mobile-chat-active');
+          // Move chat panel back to body if it was moved
+          if (mobile && chatPanel && chatPanel.parentNode !== document.body) {
+            // Insert before the panel-switcher
+            var switcher = document.getElementById('panel-switcher');
+            if (switcher) {
+              document.body.insertBefore(chatPanel, switcher);
+            } else {
+              document.body.appendChild(chatPanel);
+            }
+          }
+        }
+
+        if (switcherInfo) {
+          // On mobile, hide Info button (agents cards replace it)
+          if (mobile) {
+            switcherInfo.style.display = 'none';
+          } else {
+            switcherInfo.style.display = '';
+          }
+          switcherInfo.setAttribute('data-active', showInfo ? 'true' : 'false');
+        }
         if (switcherChat) switcherChat.setAttribute('data-active', showChat ? 'true' : 'false');
 
         if (infoToggle) {
