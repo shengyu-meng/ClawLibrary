@@ -464,10 +464,15 @@ function telemetryMiddleware() {
           for (const file of focusFiles) {
             try {
               const raw = await fs.readFile(path.join(subagentsDir, file), 'utf8');
-              const data = JSON.parse(raw) as { resourceId?: string; detail?: string };
+              const data = JSON.parse(raw) as { resourceId?: string; detail?: string; label?: string };
               if (data.resourceId) {
                 const runId = file.replace(/^focus-/, '').replace(/\.json$/, '');
-                focuses.push({ runId, resourceId: data.resourceId, detail: data.detail });
+                const entry: FocusEntry = { runId, resourceId: data.resourceId, detail: data.detail };
+                focuses.push(entry);
+                // Also register under label if present (so label-based focus files match subagent ids)
+                if (data.label) {
+                  focuses.push({ runId: data.label, resourceId: data.resourceId, detail: data.detail });
+                }
               }
             } catch { /* skip malformed */ }
           }
