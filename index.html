@@ -2213,6 +2213,211 @@
         background-clip: padding-box;
       }
 
+      /* ── Mobile Agents View ──────────────────────────────────────── */
+      .mobile-agents {
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        /* Hide Phaser canvas on mobile */
+        #app {
+          display: none !important;
+        }
+        .hud-title {
+          display: none !important;
+        }
+
+        .mobile-agents {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          position: fixed;
+          top: 12px;
+          left: 12px;
+          right: 12px;
+          bottom: 60px;
+          z-index: 100;
+          overflow-y: auto;
+          scrollbar-width: none;
+          padding-bottom: 8px;
+        }
+        .mobile-agents::-webkit-scrollbar { display: none; }
+        .mobile-agents[aria-hidden="true"] { display: none; }
+
+        .mobile-agent-card {
+          border: 1px solid rgba(171, 218, 201, 0.22);
+          border-radius: 16px;
+          padding: 14px 16px;
+          background: linear-gradient(180deg, rgba(12, 29, 27, 0.82), rgba(8, 21, 19, 0.62));
+          backdrop-filter: blur(10px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 20px rgba(0, 0, 0, 0.2);
+          display: grid;
+          gap: 8px;
+        }
+
+        .mobile-agent-card.main {
+          border-color: rgba(255, 127, 80, 0.3);
+          background: linear-gradient(180deg, rgba(18, 28, 26, 0.88), rgba(10, 22, 20, 0.72));
+        }
+
+        .mobile-agent-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .mobile-agent-name {
+          font-family: var(--font-display);
+          font-size: 22px;
+          line-height: 1;
+          color: var(--accent);
+        }
+
+        .mobile-agent-card:not(.main) .mobile-agent-name {
+          color: var(--accent-2);
+        }
+
+        .mobile-agent-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(100, 215, 176, 0.28);
+          background: rgba(20, 61, 50, 0.5);
+          font-size: 11px;
+          color: #9df0cf;
+          line-height: 1;
+        }
+
+        .mobile-agent-badge::before {
+          content: '';
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #64d7b0;
+          box-shadow: 0 0 8px #64d7b0;
+        }
+
+        .mobile-agent-badge.idle::before {
+          background: #cda57a;
+          box-shadow: 0 0 8px #cda57a;
+        }
+
+        .mobile-agent-badge.idle {
+          border-color: rgba(205, 165, 122, 0.28);
+          background: rgba(55, 38, 19, 0.46);
+          color: #ffd27f;
+        }
+
+        .mobile-agent-hp {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .mobile-agent-hp-bar {
+          flex: 1;
+          height: 8px;
+          border-radius: 999px;
+          background: rgba(7, 18, 17, 0.5);
+          overflow: hidden;
+        }
+
+        .mobile-agent-hp-fill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #64d7b0, #9df0cf);
+          transition: width 300ms ease;
+        }
+
+        .mobile-agent-hp-text {
+          font-family: var(--font-display);
+          font-size: 18px;
+          color: rgba(244, 255, 247, 0.9);
+          min-width: 40px;
+          text-align: right;
+        }
+
+        .mobile-agent-status {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 8px 10px;
+          border-radius: 10px;
+          border: 1px solid rgba(171, 218, 201, 0.12);
+          background: rgba(9, 24, 22, 0.6);
+        }
+
+        .mobile-agent-status-icon {
+          font-size: 16px;
+          line-height: 1.3;
+          flex-shrink: 0;
+        }
+
+        .mobile-agent-status-text {
+          color: rgba(230, 242, 238, 0.88);
+          font-size: 14px;
+          line-height: 1.4;
+          word-break: break-word;
+        }
+
+        .mobile-agent-meta {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .mobile-agent-meta-item {
+          display: grid;
+          gap: 1px;
+        }
+
+        .mobile-agent-meta-value {
+          font-family: var(--font-display);
+          font-size: 16px;
+          color: rgba(244, 255, 247, 0.88);
+        }
+
+        .mobile-agent-meta-label {
+          font-size: 9px;
+          color: rgba(152, 181, 172, 0.7);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
+
+        .mobile-agents-empty {
+          text-align: center;
+          padding: 40px 20px;
+          color: rgba(152, 181, 172, 0.6);
+          font-size: 14px;
+        }
+
+        /* Hide archive panel on mobile — it overlaps */
+        .menu-panel {
+          display: none !important;
+        }
+        .archive-show-tab {
+          display: none !important;
+        }
+
+        /* Reposition panel switcher and info/chat below agent cards */
+        .panel-switcher {
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: 12px;
+        }
+
+        .hud-activity {
+          display: none !important;
+        }
+
+        .hud-chat {
+          display: none !important;
+        }
+      }
+
       @media (max-width: 700px) {
         :root {
           --stage-left-gutter: 0px;
@@ -2532,6 +2737,8 @@
       </div>
     </div>
     <button class="archive-show-tab" id="archive-show-tab" type="button">Show Archive</button>
+    <!-- Mobile agents view — replaces Phaser canvas on small screens -->
+    <div id="mobile-agents" class="mobile-agents" aria-hidden="true"></div>
     <script type="module" src="/src/main.ts"></script>
     <script>
     /* ── Panel Switcher + Live Chat ────────────────────────────────── */
@@ -2707,6 +2914,146 @@
       })();
 
       setInterval(pollChat, POLL_MS);
+    })();
+    </script>
+    <script>
+    /* ── Mobile Agents View ────────────────────────────────────────── */
+    (function () {
+      var container = document.getElementById('mobile-agents');
+      var POLL_MS = 3000;
+      var isMobile = false;
+
+      function checkMobile() {
+        var wasMobile = isMobile;
+        isMobile = window.matchMedia('(max-width: 768px)').matches;
+        if (isMobile && !wasMobile) {
+          container.setAttribute('aria-hidden', 'false');
+          pollAgents();
+        } else if (!isMobile && wasMobile) {
+          container.setAttribute('aria-hidden', 'true');
+        }
+      }
+
+      function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+      function formatRuntime(ms) {
+        if (!ms || ms < 0) return '—';
+        var s = Math.floor(ms / 1000);
+        if (s < 60) return s + 's';
+        var m = Math.floor(s / 60);
+        if (m < 60) return m + 'm';
+        var h = Math.floor(m / 60);
+        return h + 'h ' + (m % 60) + 'm';
+      }
+
+      async function pollAgents() {
+        if (!isMobile) return;
+        try {
+          // Fetch subagents from runs.json via snapshot
+          var [snapshotRes, focusRes, procRes] = await Promise.all([
+            fetch('/api/openclaw/snapshot?compact=true', { cache: 'no-store' }),
+            fetch('/api/openclaw/agent-focus', { cache: 'no-store' }),
+            fetch('/api/openclaw/processes', { cache: 'no-store' })
+          ]);
+
+          var snapshot = snapshotRes.ok ? await snapshotRes.json() : {};
+          var focusData = focusRes.ok ? await focusRes.json() : { focuses: [] };
+          var procData = procRes.ok ? await procRes.json() : { processes: [] };
+
+          var focuses = {};
+          if (focusData.ok && focusData.focuses) {
+            focusData.focuses.forEach(function(f) { focuses[f.runId] = f; });
+          }
+
+          var cards = [];
+
+          // Main agent card
+          var mainCtx = snapshot.mainActorContext || {};
+          var hp = mainCtx.contextRemaining != null ? Math.round(mainCtx.contextRemaining * 100) : null;
+          var mainFocus = snapshot.focus || {};
+          var mainStatus = mainFocus.detail || mainCtx.detail || 'Ready';
+
+          cards.push(
+            '<div class="mobile-agent-card main">'
+            + '<div class="mobile-agent-header">'
+            + '<span class="mobile-agent-name">🦞 ClawBot</span>'
+            + '<span class="mobile-agent-badge">Active</span>'
+            + '</div>'
+            + (hp != null ? (
+              '<div class="mobile-agent-hp">'
+              + '<div class="mobile-agent-hp-bar"><div class="mobile-agent-hp-fill" style="width:' + hp + '%"></div></div>'
+              + '<span class="mobile-agent-hp-text">' + hp + '%</span>'
+              + '</div>'
+            ) : '')
+            + '<div class="mobile-agent-status">'
+            + '<span class="mobile-agent-status-icon">💭</span>'
+            + '<span class="mobile-agent-status-text">' + esc(mainStatus) + '</span>'
+            + '</div>'
+            + '</div>'
+          );
+
+          // Active subagents
+          var agents = (snapshot.activeAgents || []).filter(function(a) { return !a.endedAt; });
+          agents.forEach(function(agent) {
+            var focus = focuses[agent.id] || focuses[agent.label] || {};
+            var status = focus.detail || 'Working...';
+            var runtime = agent.startedAt ? Date.now() - new Date(agent.startedAt).getTime() : 0;
+
+            cards.push(
+              '<div class="mobile-agent-card">'
+              + '<div class="mobile-agent-header">'
+              + '<span class="mobile-agent-name">🐹 ' + esc(agent.label || agent.id.slice(0, 8)) + '</span>'
+              + '<span class="mobile-agent-badge">Running</span>'
+              + '</div>'
+              + '<div class="mobile-agent-status">'
+              + '<span class="mobile-agent-status-icon">💭</span>'
+              + '<span class="mobile-agent-status-text">' + esc(status) + '</span>'
+              + '</div>'
+              + '<div class="mobile-agent-meta">'
+              + '<div class="mobile-agent-meta-item"><span class="mobile-agent-meta-value">' + formatRuntime(runtime) + '</span><span class="mobile-agent-meta-label">Runtime</span></div>'
+              + (agent.model ? '<div class="mobile-agent-meta-item"><span class="mobile-agent-meta-value">' + esc(agent.model.split('/').pop()) + '</span><span class="mobile-agent-meta-label">Model</span></div>' : '')
+              + '</div>'
+              + '</div>'
+            );
+          });
+
+          // Active exec-processes
+          var procs = (procData.ok && procData.processes) ? procData.processes : [];
+          procs.forEach(function(proc) {
+            var focus = focuses[proc.id] || {};
+            var status = focus.detail || proc.label || 'Running...';
+            var runtime = proc.startedAt ? Date.now() - new Date(proc.startedAt).getTime() : 0;
+
+            cards.push(
+              '<div class="mobile-agent-card">'
+              + '<div class="mobile-agent-header">'
+              + '<span class="mobile-agent-name">⚙ ' + esc(proc.label || proc.id) + '</span>'
+              + '<span class="mobile-agent-badge">Running</span>'
+              + '</div>'
+              + '<div class="mobile-agent-status">'
+              + '<span class="mobile-agent-status-icon">💭</span>'
+              + '<span class="mobile-agent-status-text">' + esc(status) + '</span>'
+              + '</div>'
+              + '<div class="mobile-agent-meta">'
+              + '<div class="mobile-agent-meta-item"><span class="mobile-agent-meta-value">' + formatRuntime(runtime) + '</span><span class="mobile-agent-meta-label">Runtime</span></div>'
+              + '</div>'
+              + '</div>'
+            );
+          });
+
+          if (cards.length === 1 && agents.length === 0 && procs.length === 0) {
+            cards.push('<div class="mobile-agents-empty">No sub-agents running</div>');
+          }
+
+          container.innerHTML = cards.join('');
+        } catch(e) {
+          // best-effort
+        }
+      }
+
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+      setInterval(function() { if (isMobile) pollAgents(); }, POLL_MS);
     })();
     </script>
     <script>
