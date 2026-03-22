@@ -52,7 +52,15 @@ const game = new Phaser.Game({
   parent: 'app',
   transparent: true,
   audio: {
-    noAudio: true
+    // AudioContext requires a user gesture before it can start.
+    // We resume it on the first pointerdown so the browser doesn't block it.
+    // (noAudio: true was set here before — it silenced the console warning but killed all sound)
+    context: (() => {
+      const ctx = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+      const resume = () => { void ctx.resume(); };
+      window.addEventListener('pointerdown', resume, { once: true });
+      return ctx;
+    })()
   },
   scale: {
     mode: Phaser.Scale.FIT,
