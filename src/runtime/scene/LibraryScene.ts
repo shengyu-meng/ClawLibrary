@@ -102,6 +102,8 @@ type AgentActor = {
   visualMode: WorkMode;
   /** Timestamp (ms) when working animation should end and revert to idle */
   workingUntil: number;
+  /** Timestamp (ms) until which the actor lingers at its destination before picking a new one */
+  lingerUntil: number;
 };
 
 export class LibraryScene extends Phaser.Scene {
@@ -468,7 +470,8 @@ export class LibraryScene extends Phaser.Scene {
       nameTag,
       thoughtBubble,
       visualMode: 'idle',
-      workingUntil: 0
+      workingUntil: 0,
+      lingerUntil: 0
     };
 
     // Set initial animation for subagents
@@ -535,13 +538,34 @@ export class LibraryScene extends Phaser.Scene {
     }
 
     if (actor.route.length === 0) {
+      // Linger at destination before picking a new route (prevents jitter + frozen loops)
+      const now = Date.now();
+      if (actor.lingerUntil > 0 && now < actor.lingerUntil) {
+        // Still lingering — update visual but don't pick new route
+        if (actor.kind === 'subagent') {
+          const targetMode: WorkMode = actor.workingUntil > 0 && now < actor.workingUntil ? 'working' : 'idle';
+          if (actor.visualMode !== targetMode) {
+            actor.visualMode = targetMode;
+            this.updateAgentActorVisual(actor, targetMode);
+          }
+        }
+        return;
+      }
+
       // Subagent visual: if working timer expired, revert to idle
       if (actor.kind === 'subagent') {
-        const targetMode: WorkMode = actor.workingUntil > 0 && Date.now() < actor.workingUntil ? 'working' : 'idle';
+        const targetMode: WorkMode = actor.workingUntil > 0 && now < actor.workingUntil ? 'working' : 'idle';
         if (actor.visualMode !== targetMode) {
           actor.visualMode = targetMode;
           this.updateAgentActorVisual(actor, targetMode);
         }
+      }
+
+      // If we have a focusZoneId and we're already in that zone, linger longer (don't re-route to same spot)
+      if (actor.focusZoneId && actor.focusZoneId === actor.activeZoneId) {
+        actor.lingerUntil = now + 4000 + Math.random() * 3000; // 4-7s idle at focus zone
+        actor.activeZoneId = null;
+        return;
       }
 
       // Pick next zone to wander to — exclude zones claimed by primary or other agents
@@ -631,14 +655,18 @@ export class LibraryScene extends Phaser.Scene {
       actor.route.shift();
 
       if (actor.route.length === 0) {
-        // Arrived — subagent plays working animation briefly, then idle
+        // Arrived — set linger timer so they stay put for a while
+        const lingerMs = actor.focusZoneId
+          ? 5000 + Math.random() * 5000   // 5-10s at focus zone
+          : 2000 + Math.random() * 3000;  // 2-5s wandering
+        actor.lingerUntil = Date.now() + lingerMs;
+
+        // Subagent plays working animation briefly, then idle
         if (actor.kind === 'subagent') {
           actor.visualMode = 'working';
           actor.workingUntil = Date.now() + 1400;
           this.updateAgentActorVisual(actor, 'working');
         }
-        // linger briefly then clear zone so next frame picks new destination
-        actor.activeZoneId = null;
       }
     } else {
       actor.container.x += (dx / distance) * step;
