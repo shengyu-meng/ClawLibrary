@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import appConfig from '../clawlibrary.config.json';
 import { LibraryScene } from './runtime/scene/LibraryScene';
-import type { GrowthState, OpenClawResourceItem, OpenClawSnapshot, ResourcePartitionId } from './core/types';
+import type { ActiveExecProcess, GrowthState, OpenClawResourceItem, OpenClawSnapshot, ResourcePartitionId } from './core/types';
 import type { UiLocale } from './ui/locale';
 import { resourceLabel, uiText } from './ui/locale';
 import { PARTITION_CSS_COLORS } from './ui/palette';
@@ -51,6 +51,9 @@ const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'app',
   transparent: true,
+  audio: {
+    noAudio: true
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -184,6 +187,8 @@ type DebugPoint = {
 };
 
 let lastSnapshot: OpenClawSnapshot | null = null;
+let prevActiveAgentIds = new Set<string>();
+let prevActiveProcessIds = new Set<string>();
 const resourceDetailItemsById = new Map<ResourcePartitionId, OpenClawResourceItem[]>();
 const resourceDetailLoadedById = new Set<ResourcePartitionId>();
 const resourceDetailRequestsById = new Map<ResourcePartitionId, Promise<void>>();
@@ -2877,6 +2882,79 @@ async function refreshTelemetry(): Promise<void> {
     lastSnapshot = (await response.json()) as OpenClawSnapshot;
     const activeScene = getActiveScene();
     activeScene?.applyTelemetrySnapshot(lastSnapshot);
+
+    // Diff activeAgents to spawn/despawn secondary actors (subagents)
+    const currentAgents = lastSnapshot.activeAgents ?? [];
+    const currentAgentIds = new Set(currentAgents.map((agent) => agent.id));
+    if (activeScene) {
+      for (const agent of currentAgents) {
+        if (!prevActiveAgentIds.has(agent.id)) {
+          activeScene.spawnAgentActor(agent.id, agent.label, 'subagent');
+        }
+      }
+      for (const prevId of prevActiveAgentIds) {
+        if (!currentAgentIds.has(prevId)) {
+          activeScene.despawnAgentActor(prevId);
+        }
+      }
+      prevActiveAgentIds = currentAgentIds;
+    }
+
+    // Apply focus zones from focus-*.json files (written by subagents/processes)
+    void (async () => {
+      try {
+        const focusResponse = await fetch('/api/openclaw/agent-focus', { cache: 'no-store' });
+        if (!focusResponse.ok) return;
+        const focusData = (await focusResponse.json()) as {
+          ok: boolean;
+          focuses: Array<{ runId: string; resourceId: string; detail?: string }>;
+        };
+        if (!focusData.ok) return;
+        const sceneReady = getActiveScene();
+        if (!sceneReady) return;
+        const focusMap = new Map(focusData.focuses.map((f) => [f.runId, f]));
+        // Apply to subagents
+        for (const agent of currentAgents) {
+          const focus = focusMap.get(agent.id);
+          sceneReady.setAgentActorFocus(agent.id, (focus?.resourceId as ResourcePartitionId) ?? null);
+        }
+        // Apply to exec-processes (prefixed with proc:)
+        for (const [procId] of prevActiveProcessIds.entries()) {
+          const focus = focusMap.get(procId);
+          sceneReady.setAgentActorFocus(`proc:${procId}`, (focus?.resourceId as ResourcePartitionId) ?? null);
+        }
+      } catch { /* best-effort */ }
+    })();
+
+    // Diff activeProcesses to spawn/despawn exec-process actors (amber capys, slow)
+    void (async () => {
+      try {
+        const procResponse = await fetch('/api/openclaw/processes', { cache: 'no-store' });
+        if (!procResponse.ok) return;
+        const procData = (await procResponse.json()) as { ok: boolean; processes: ActiveExecProcess[] };
+        if (!procData.ok) return;
+        const currentProcesses = procData.processes.filter((p) => p.status === 'running');
+        const currentProcIds = new Set(currentProcesses.map((p) => p.id));
+        const sceneReady = getActiveScene();
+        if (sceneReady) {
+          for (const proc of currentProcesses) {
+            if (!prevActiveProcessIds.has(proc.id)) {
+              // Use a process-scoped id to avoid collision with subagent ids
+              sceneReady.spawnAgentActor(`proc:${proc.id}`, proc.label, 'exec-process');
+            }
+          }
+          for (const prevId of prevActiveProcessIds) {
+            if (!currentProcIds.has(prevId)) {
+              sceneReady.despawnAgentActor(`proc:${prevId}`);
+            }
+          }
+          prevActiveProcessIds = currentProcIds;
+        }
+      } catch {
+        // ignore — process endpoint is best-effort
+      }
+    })();
+
     ensureSceneBindings();
     syncResourceControls();
     renderRoomModal();

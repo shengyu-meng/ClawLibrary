@@ -452,6 +452,63 @@ function telemetryMiddleware() {
       return;
     }
 
+    if (req.url?.startsWith('/api/openclaw/agent-focus') && req.method === 'GET') {
+      try {
+        // Read all focus-*.json files from ~/.openclaw/subagents/
+        const subagentsDir = path.join(clawlibraryConfig.openclaw.home, 'subagents');
+        type FocusEntry = { runId: string; resourceId: string; detail?: string };
+        const focuses: FocusEntry[] = [];
+        try {
+          const entries = await fs.readdir(subagentsDir);
+          const focusFiles = entries.filter((f) => f.startsWith('focus-') && f.endsWith('.json'));
+          for (const file of focusFiles) {
+            try {
+              const raw = await fs.readFile(path.join(subagentsDir, file), 'utf8');
+              const data = JSON.parse(raw) as { resourceId?: string; detail?: string };
+              if (data.resourceId) {
+                const runId = file.replace(/^focus-/, '').replace(/\.json$/, '');
+                focuses.push({ runId, resourceId: data.resourceId, detail: data.detail });
+              }
+            } catch { /* skip malformed */ }
+          }
+        } catch { /* dir doesn't exist */ }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(JSON.stringify({ ok: true, focuses }));
+      } catch (error) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      }
+      return;
+    }
+
+    if (req.url?.startsWith('/api/openclaw/processes') && req.method === 'GET') {
+      try {
+        // Read the exec-processes registry written by ClawBot when launching background agents
+        const registryPath = path.join(clawlibraryConfig.openclaw.home, 'exec-processes.json');
+        type ProcessEntry = { id: string; label: string; command: string; status: string; startedAt?: string };
+        let processes: ProcessEntry[] = [];
+        try {
+          const raw = await fs.readFile(registryPath, 'utf8');
+          const all = JSON.parse(raw) as ProcessEntry[];
+          processes = all.filter((p) => p.status === 'running');
+        } catch {
+          // file doesn't exist — return empty list
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(JSON.stringify({ ok: true, processes }));
+      } catch (error) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      }
+      return;
+    }
+
     if (!req.url?.startsWith('/api/openclaw/snapshot')) {
       next();
       return;

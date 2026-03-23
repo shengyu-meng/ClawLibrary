@@ -351,10 +351,35 @@ export type OpenClawFocus = {
   reason: string;
 };
 
+export type ActiveAgent = {
+  id: string;
+  label: string;
+  status: string;
+};
+
+export type ActiveExecProcess = {
+  id: string;
+  label: string;
+  command: string;
+  status: 'running' | 'completed' | 'failed';
+};
+
+export type MainActorContext = {
+  /** Current context token count for the active main-agent session */
+  tokens: number;
+  /** Inferred max context window for the active model */
+  maxTokens: number;
+  /** Remaining fraction 0–1 (1 = full, 0 = exhausted) */
+  remaining: number;
+};
+
 export type OpenClawSnapshot = {
   mode: 'live' | 'mock';
   generatedAt: string;
   resources: OpenClawResourceTelemetry[];
   recentEvents: OpenClawAccessEvent[];
   focus: OpenClawFocus;
+  activeAgents?: ActiveAgent[];
+  activeProcesses?: ActiveExecProcess[];
+  mainActorContext?: MainActorContext;
 };
